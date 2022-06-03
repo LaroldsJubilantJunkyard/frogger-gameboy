@@ -12,6 +12,8 @@
 
 #define FONT_TILES_START GameplayBackground_TILE_COUNT+Obstacles_TILE_COUNT+FrogCompleted_TILE_COUNT
 
+#define FROG_COMPLETED_TILES_START GameplayBackground_TILE_COUNT+Obstacles_TILE_COUNT
+
 #define YELLOW_BUS 0
 #define RED_CAR 1
 #define RED_TRUCK 2
@@ -40,20 +42,20 @@ int16_t rowSpeeds[18]={
     0,
 
     // Water
-   8,
-    -8,
-    8,
-    -8,
-    -8,
+   6,
+    -6,
+    6,
+    -6,
+    -6,
 
     0,
 
     // Street
-    8,
-    -8,
-    8,
-    -8,
-    -8,
+    6,
+    -6,
+    6,
+    -6,
+    -6,
 
     // UI & Start
     0,
@@ -221,7 +223,7 @@ uint8_t FinishInSpot(uint8_t spot){
 
     ResetFrog();
 
-    if(completionSpots[spot]==TRUE)return;
+    if(completionSpots[spot]==TRUE)return FALSE;
 
     completionSpots[spot]=TRUE;
 
@@ -232,9 +234,11 @@ uint8_t FinishInSpot(uint8_t spot){
     for(uint8_t i=0;i<5;i++){
 
         if(completionSpots[i]==FALSE)anyEmpty=TRUE;
+        else{
+            VBK_REG=1;set_bkg_tiles(1+4*i,1,2,2,FrogCompleted_map_attributes);
+            VBK_REG=0;set_bkg_based_tiles(1+4*i,1,2,2,FrogCompleted_map,FROG_COMPLETED_TILES_START);
+        }
 
-        VBK_REG=1;set_bkg_tiles(1+4*i,1,2,2,FrogCompleted_map_attributes);
-        VBK_REG=0;set_bkg_tiles(1+4*i,1,2,2,FrogCompleted_map);
     }
 
 
@@ -268,7 +272,7 @@ void SetupGameplay(void){
 
     set_bkg_data(0,Obstacles_TILE_COUNT,Obstacles_tiles);
     set_bkg_data(Obstacles_TILE_COUNT,GameplayBackground_TILE_COUNT,GameplayBackground_tiles);
-    set_bkg_data(GameplayBackground_TILE_COUNT+Obstacles_TILE_COUNT,FrogCompleted_TILE_COUNT,FrogCompleted_tiles);
+    set_bkg_data(FROG_COMPLETED_TILES_START,FrogCompleted_TILE_COUNT,FrogCompleted_tiles);
     set_bkg_data(FONT_TILES_START,Font_TILE_COUNT,Font_tiles);
 
     set_sprite_data(0,Frog_TILE_COUNT,Frog_tiles);
@@ -301,10 +305,10 @@ void SetupGameplay(void){
 
     // Street
     DrawOnRow(9,0,4,&allObstacles[YELLOW_BUS]);
-    DrawOnRow(10,0,3,&allObstacles[GREEN_CAR]);
+    DrawOnRow(10,0,4,&allObstacles[GREEN_CAR]);
     DrawOnRow(11,0,4,&allObstacles[RED_TRUCK]);
-    DrawOnRow(12,0,4,&allObstacles[BLUE_CAR]);
-    DrawOnRow(13,0,4,&allObstacles[PURPLE_CAR]);
+    DrawOnRow(12,0,5,&allObstacles[BLUE_CAR]);
+    DrawOnRow(13,0,5,&allObstacles[PURPLE_CAR]);
 
     // Reset our score and lives
     score=0;
@@ -333,14 +337,23 @@ uint8_t UpdateGameplay(){
 
     if(hit){
 
+        // The frog metasprite to show. Starting at 6
+        // The death animation is 9 frames long
         frogFrame = ((playerDeathAnimation>>4)>=9?8:(playerDeathAnimation>>4))+6;
 
+        // The speed of the death animation
         playerDeathAnimation+=5;
 
+        // Wait until 10 frames would have been played
         if((playerDeathAnimation>>4)>=10){
+
             hit=FALSE;
+
+            // Decrease lives or go to gameover
             if(lives>0)lives--;
             else return GAMEOVER_STATE;
+
+            // Reset our frog and update how many lives we have
             UpdateLives();
             ResetFrog();
         }
@@ -380,7 +393,16 @@ uint8_t UpdateGameplay(){
 
             }else if((frogY>>4)/8<3){
 
-                if(FinishInSpot(((frogX>>4)/8)/3)){
+                uint8_t slot= 0;
+
+                uint8_t column = (frogX>>4)/8;
+
+                if(column>=17)slot=4;
+                else if(column>=13)slot=3;
+                else if(column>=9)slot=2;
+                else if(column>=5)slot=1;
+
+                if(FinishInSpot(slot)){
 
                     return GETREADY_STATE;
                 }
